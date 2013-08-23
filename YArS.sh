@@ -65,7 +65,7 @@
 #
 # --- SCRIPT BEGIN -------------------------------------------------------------
 
-VERSION="v0.1a 2013-08-23"
+VERSION="v0.1.1a 2013-08-23"
 
 # Matches a timestamp as produced by the function with the same name and an
 # optional trailing backslash ('/')
@@ -178,8 +178,17 @@ if (( ! DELETE_ONLY )); then
     LOCAL_RSYNC_OPTIONS+=" --link-dest=${PREVIOUS_BACKUP}"
   fi
 
-  # Finally, make run rsync to make the backup ...
-  rsync ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} "${SOURCE}" "${CURRENT_BACKUP}"
+  # Check if there are changes; only then really apply them. This supresses
+  # clutter in the destination.
+  CHANGES=$(rsync ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} \
+                  --dry-run --no-verbose --out-format="%i" \
+                  "${SOURCE}" "${CURRENT_BACKUP}")
+  if [[ -n ${CHANGES} ]]; then
+    # Finally, make run rsync to make the backup ...
+    rsync ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} "${SOURCE}" "${CURRENT_BACKUP}"
+  else
+    echo "Nothing done; everythings in sync. :)" 1>&2
+  fi
 fi
 
 
