@@ -30,6 +30,10 @@
 # RSYNC_OPTIONS below).
 : ${RSYNC_OPTIONS:=''}
 
+# If a log file is given a new line for each run will be generated; unless the
+# call results in the help or version being shown.
+: ${LOG:=''}
+
 
 # The following options control the magnitude of the overall backup. Magnitude
 # relates to number, age or file size. All deletion takes place AFTER the
@@ -96,6 +100,12 @@ function print_version {
 
 function report_unkown_option {
   echo "error: unkown option '$1'" 1>&2
+}
+
+function log {
+  if [[ -n ${LOG} ]]; then
+    echo "$(date +'%F %T') $(whoami)@$(hostname) $0[$$] $1" >> "${LOG}"
+  fi
 }
 
 function timestamp {
@@ -186,8 +196,15 @@ if (( ! DELETE_ONLY )); then
   if [[ -n ${CHANGES} ]]; then
     # Finally, make run rsync to make the backup ...
     rsync ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} "${SOURCE}" "${CURRENT_BACKUP}"
+
+    if (( $? == 0 )); then
+      log 'backup done'
+    else
+      log 'backup failed'
+    fi
   else
-    echo "Nothing done; everythings in sync. :)" 1>&2
+    log 'everything in sync; backup done'
+    echo "Nothing done -- everythings in sync. :)" 1>&2
   fi
 fi
 
