@@ -89,7 +89,7 @@ TIMESTAMP_REGEX="^[0-9]{4}(-[0-5][0-9]){5}\/?$"
 
 function print_help {
   (
-    echo "USAGE $(basename "$0") -f|--full|-d|--delete-only [-s|--suppress-clutter] [-h|--help] [-v|--version]"
+    echo "USAGE $(basename "$0") [-f|--full|-d|--delete-only] [-s|--suppress-clutter] [-h|--help] [-v|--version]"
     echo "  -f, --full              Run a full backup (instead of incremental)"
     echo "  -d, --delete-only       Just delete backups to meet magnitude requirements"
     echo "  -s, --suppress-clutter  Delete backup if no changes were detected"
