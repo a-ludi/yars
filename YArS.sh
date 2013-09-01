@@ -26,6 +26,10 @@
 # the creation fails the script will exit with a status of 2.
 : ${DESTINATION:=''}
 
+# Exclude file patterns from the backup (see --exclude option from rsync). You
+# may specify multiple patterns separated by colons (':').
+: ${EXCLUDE:=''}
+
 # This provides a way to control rsync. This OVERRIDES the default options (see
 # RSYNC_OPTIONS below).
 : ${RSYNC_OPTIONS:=''}
@@ -43,11 +47,19 @@
 # kept, ie every odd backup will be deleted beginning with the oldest.
 : ${KEEP_NUM:=0}
 
+# TODO make a adaptive history, eg:
+#     - the last 60 minutes
+#     - the last 24 hour
+#     - the last 30 days
+#     - the last 12 month
+#     - the last 2 years
+
 # If you set this option to a to some abitrary date only backups newer than that
 # date will be kept; if the date lies in the future nothing is deleted and a
-# warning is issued. The date string must be understood by 'date --date=STRING',
-# eg '3 months ago'
+# warning is issued. This options respects the KEEP_NUM option and preserves at
+# least KEEP_NUM backups.
 #
+# The date string must be understood by 'date --date=STRING', eg '3 months ago'.
 # Refer to `man date` and `info coreutils 'date input formats'` for details.
 : ${KEEP_AFTER:=''}
 
@@ -69,7 +81,7 @@
 #
 # --- SCRIPT BEGIN -------------------------------------------------------------
 
-VERSION="v0.1.1a 2013-08-23"
+VERSION="v0.1.3a 2013-09-01"
 
 # Matches a timestamp as produced by the function with the same name and an
 # optional trailing backslash ('/')
@@ -77,11 +89,12 @@ TIMESTAMP_REGEX="^[0-9]{4}(-[0-5][0-9]){5}\/?$"
 
 function print_help {
   (
-    echo "USAGE $(basename "$0") [--full|--delete-only] [-h|--help] [-v|--version]"
-    echo "  --full               Run a full backup (instead of incremental)"
-    echo "  --delete-only        Just delete backups to meet magnitude requirements"
-    echo "  -v, --version        Display version number, copyright info and exit"
-    echo "  -h, --help, --usage  Display this help and exit"
+    echo "USAGE $(basename "$0") [--full|--delete-only] [-s|--suppress-clutter] [-h|--help] [-v|--version]"
+    echo "  --full                  Run a full backup (instead of incremental)"
+    echo "  --delete-only           Just delete backups to meet magnitude requirements"
+    echo "  -s, --suppress-clutter  Delete backup if no changes were detected"
+    echo "  -v, --version           Display version number, copyright info and exit"
+    echo "  -h, --help, --usage     Display this help and exit"
     echo
     echo "Configure this script to match your own needs by editing this file or by setting the appropriate environment variables"
   ) 1>&2
@@ -115,19 +128,19 @@ function timestamp {
 function is_before {
   if [[ "$1" =~ ${TIMESTAMP_REGEX} ]]; then
     # remove hyphens and backslashes
-    DATE1=${1//[\/-]/}
+    __is_before_DATE1=${1//[\/-]/}
   else
-    DATE1=$(date +%Y%m%d%H%M%S --date="${1:-now}")
+    __is_before_DATE1=$(date +%Y%m%d%H%M%S --date="${1:-now}")
   fi
 
   if [[ "$2" =~ ${TIMESTAMP_REGEX} ]]; then
     # remove hyphens and backslashes
-    DATE2=${2//[\/-]/}
+    __is_before_DATE2=${2//[\/-]/}
   else
-    DATE2=$(date +%Y%m%d%H%M%S --date="${2:-now}")
+    __is_before_DATE2=$(date +%Y%m%d%H%M%S --date="${2:-now}")
   fi
 
-  (( DATE1 < DATE2 ))
+  (( __is_before_DATE1 < __is_before_DATE2 ))
 }
 
 
@@ -139,6 +152,9 @@ for ARG in "$@"; do
       ;;
     --delete-only)
       DELETE_ONLY=1
+      ;;
+    -s|--suppress-clutter)
+      SUPPRESS_CLUTTER=1
       ;;
     -v|--version)
       SHOW_VERSION=1
@@ -176,6 +192,16 @@ if (( ! DELETE_ONLY )); then
   PREVIOUS_BACKUP="${DESTINATION}/${PREVIOUS_BACKUP}"
   CURRENT_BACKUP="${DESTINATION}/$(timestamp)"
 
+  LOCAL_RSYNC_OPTIONS='--no-verbose --out-format="%i"'
+
+  # Include the patterns from EXCLUDE
+  OLD_IFS="${IFS}"
+  IFS=":"
+  for EXLUDE_PATH in $EXCLUDE; do
+    LOCAL_RSYNC_OPTIONS+=" --exclude ${EXLUDE_PATH}"
+  done
+  IFS="${OLD_IFS}"
+
   # Default options (see 'man rsync' for details):
   #   -a                 archive mode; equals -rlptgoD (no -H,-A,-X)
   #   -h                 output numbers in a human-readable format
@@ -188,33 +214,35 @@ if (( ! DELETE_ONLY )); then
     LOCAL_RSYNC_OPTIONS+=" --link-dest=${PREVIOUS_BACKUP}"
   fi
 
-  # Check if there are changes; only then really apply them. This supresses
-  # clutter in the destination.
-  CHANGES=$(rsync ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} \
-                  --dry-run --no-verbose --out-format="%i" \
-                  "${SOURCE}" "${CURRENT_BACKUP}")
-  if [[ -n ${CHANGES} ]]; then
-    # Finally, make run rsync to make the backup ...
-    rsync ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} "${SOURCE}" "${CURRENT_BACKUP}"
+  mkdir -p "${CURRENT_BACKUP}"
 
-    if (( $? == 0 )); then
+  # Finally, make run rsync to make the backup ...
+  CHANGES=$(rsync ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} "${SOURCE}" "${CURRENT_BACKUP}")
+
+  if (( $? == 0 )); then
+    # Check if there were changes
+    if [[ -n ${CHANGES} ]]; then
       log 'backup done'
     else
-      log 'backup failed'
+      # No changes were synced; remove directory if desired
+      if (( SUPPRESS_CLUTTER )); then
+        rm -rf "${CURRENT_BACKUP}"
+      fi
+
+      log 'everything in sync; backup done'
+      echo "Nothing done -- everythings in sync. :)" 1>&2
     fi
   else
-    log 'everything in sync; backup done'
-    echo "Nothing done -- everythings in sync. :)" 1>&2
+    log 'backup failed'
   fi
 fi
 
 
 # Now, let's delete old backups if desired!
 
+# Count the present backups (see PREVIOUS_BACKUP for details)
+NUM_BACKUPS=$(ls -1F "${DESTINATION}" | grep -cE "${TIMESTAMP_REGEX}")
 if (( KEEP_NUM > 0 )); then
-  # Count the present backups (see PREVIOUS_BACKUP for details)
-  NUM_BACKUPS=$(ls -1F "${DESTINATION}" | grep -cE "${TIMESTAMP_REGEX}")
-
   # Delete the oldest backup until the count drops below NUM_BACKUPS
   until (( NUM_BACKUPS <= KEEP_NUM )); do
     # Get the oldest backup's name (see PREVIOUS_BACKUP for details)
@@ -226,10 +254,20 @@ if (( KEEP_NUM > 0 )); then
   done
 fi
 
-if [[ -n ${KEEP_AFTER} ]] && is_before "${KEEP_AFTER}" 'now'; then
-  for BACKUP in $(ls -1F "${DESTINATION}" | grep -E "${TIMESTAMP_REGEX}"); do
-    if is_before "${BACKUP}" "${KEEP_AFTER}"; then
-      rm -rf "${DESTINATION}/${BACKUP}"
-    fi
-  done
+if [[ -n ${KEEP_AFTER} ]]; then
+  if is_before "${KEEP_AFTER}" 'now'; then
+    for BACKUP in $(ls -1F "${DESTINATION}" | grep -E "${TIMESTAMP_REGEX}"); do
+      if is_before "${BACKUP}" "${KEEP_AFTER}" &&
+        if [[ -n ${KEEP_NUM} ]] && (( NUM_BACKUPS > KEEP_NUM )); then
+          rm -rf "${DESTINATION}/${BACKUP}"
+          NUM_BACKUPS=$(( NUM_BACKUPS - 1 ))
+        elif [[ -z ${KEEP_NUM} ]]; then
+          rm -rf "${DESTINATION}/${BACKUP}"
+        fi
+      fi
+    done
+  else
+    echo 'warning: KEEP_AFTER lies in the future; doing nothing' >&2
+    log 'warning: KEEP_AFTER lies in the future; doing nothing'
+  fi
 fi
