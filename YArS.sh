@@ -81,7 +81,7 @@
 #
 # --- SCRIPT BEGIN -------------------------------------------------------------
 
-VERSION="v0.1.3a 2013-09-01"
+VERSION="v0.1.4a 2013-09-01"
 
 # Matches a timestamp as produced by the function with the same name and an
 # optional trailing backslash ('/')
@@ -89,9 +89,9 @@ TIMESTAMP_REGEX="^[0-9]{4}(-[0-5][0-9]){5}\/?$"
 
 function print_help {
   (
-    echo "USAGE $(basename "$0") [--full|--delete-only] [-s|--suppress-clutter] [-h|--help] [-v|--version]"
-    echo "  --full                  Run a full backup (instead of incremental)"
-    echo "  --delete-only           Just delete backups to meet magnitude requirements"
+    echo "USAGE $(basename "$0") -f|--full|-d|--delete-only [-s|--suppress-clutter] [-h|--help] [-v|--version]"
+    echo "  -f, --full              Run a full backup (instead of incremental)"
+    echo "  -d, --delete-only       Just delete backups to meet magnitude requirements"
     echo "  -s, --suppress-clutter  Delete backup if no changes were detected"
     echo "  -v, --version           Display version number, copyright info and exit"
     echo "  -h, --help, --usage     Display this help and exit"
@@ -147,10 +147,10 @@ function is_before {
 # Command line processing
 for ARG in "$@"; do
   case ${ARG} in
-    --full)
+    -f|--full)
       REQUIRE_FULL=1
       ;;
-    --delete-only)
+    -d|--delete-only)
       DELETE_ONLY=1
       ;;
     -s|--suppress-clutter)
@@ -257,7 +257,7 @@ fi
 if [[ -n ${KEEP_AFTER} ]]; then
   if is_before "${KEEP_AFTER}" 'now'; then
     for BACKUP in $(ls -1F "${DESTINATION}" | grep -E "${TIMESTAMP_REGEX}"); do
-      if is_before "${BACKUP}" "${KEEP_AFTER}" &&
+      if is_before "${BACKUP}" "${KEEP_AFTER}"; then
         if [[ -n ${KEEP_NUM} ]] && (( NUM_BACKUPS > KEEP_NUM )); then
           rm -rf "${DESTINATION}/${BACKUP}"
           NUM_BACKUPS=$(( NUM_BACKUPS - 1 ))
