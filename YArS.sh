@@ -81,7 +81,7 @@
 #
 # --- SCRIPT BEGIN -------------------------------------------------------------
 
-VERSION="v0.1.5a 2013-09-01"
+VERSION="v0.1.6a 2013-09-01"
 
 # Matches a timestamp as produced by the function with the same name and an
 # optional trailing backslash ('/')
@@ -218,7 +218,6 @@ if (( ! DELETE_ONLY )); then
 
   mkdir -p "${CURRENT_BACKUP}"
 
-
   # Dry run rsync to make check for differences ...
   if (( SUPPRESS_CLUTTER )); then
     CHANGES="$(rsync --dry-run ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} '${SOURCE}' '${CURRENT_BACKUP}')"
@@ -235,7 +234,9 @@ if (( ! DELETE_ONLY )); then
       log 'backup failed'
     fi
   else
-    # No changes were synced; remove directory if desired
+    # No changes were synced; remove directory
+    rmdir "${CURRENT_BACKUP}"
+
     log 'everything in sync; backup done'
     echo "Nothing done -- everything's in sync. :)" 1>&2
   fi
