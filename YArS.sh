@@ -81,12 +81,14 @@
 #
 # --- SCRIPT BEGIN -------------------------------------------------------------
 
-VERSION="v0.1.4a 2013-09-01"
+VERSION="v0.1.5a 2013-09-01"
 
 # Matches a timestamp as produced by the function with the same name and an
 # optional trailing backslash ('/')
 TIMESTAMP_REGEX="^[0-9]{4}(-[0-5][0-9]){5}\/?$"
 
+# TODO fetch paths from command line as last two params
+# TODO fetch EXCLUDE, LOG, KEEP_* from command line
 function print_help {
   (
     echo "USAGE $(basename "$0") [-f|--full|-d|--delete-only] [-s|--suppress-clutter] [-h|--help] [-v|--version]"
@@ -216,24 +218,26 @@ if (( ! DELETE_ONLY )); then
 
   mkdir -p "${CURRENT_BACKUP}"
 
-  # Finally, make run rsync to make the backup ...
-  CHANGES=$(rsync ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} "${SOURCE}" "${CURRENT_BACKUP}")
 
-  if (( $? == 0 )); then
-    # Check if there were changes
-    if [[ -n ${CHANGES} ]]; then
+  # Dry run rsync to make check for differences ...
+  if (( SUPPRESS_CLUTTER )); then
+    CHANGES="$(rsync --dry-run ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} '${SOURCE}' '${CURRENT_BACKUP}')"
+  fi
+
+  # Check if there were changes
+  if [[ -n ${CHANGES} ]] || (( ! SUPPRESS_CLUTTER )); then
+    # Finally, run rsync to make the backup ...
+    rsync ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} "${SOURCE}" "${CURRENT_BACKUP}"
+
+    if (( $? == 0 )); then
       log 'backup done'
     else
-      # No changes were synced; remove directory if desired
-      if (( SUPPRESS_CLUTTER )); then
-        rm -rf "${CURRENT_BACKUP}"
-      fi
-
-      log 'everything in sync; backup done'
-      echo "Nothing done -- everythings in sync. :)" 1>&2
+      log 'backup failed'
     fi
   else
-    log 'backup failed'
+    # No changes were synced; remove directory if desired
+    log 'everything in sync; backup done'
+    echo "Nothing done -- everything's in sync. :)" 1>&2
   fi
 fi
 
