@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 # This script makes incremental or full backups of a given folder using rsync.
 #     Copyright (C) 2013  Arne Ludwig <ludwig.arne@gmail.com>
 #
@@ -81,7 +81,7 @@
 #
 # --- SCRIPT BEGIN -------------------------------------------------------------
 
-VERSION="v0.1.6a 2013-09-01"
+VERSION="v0.1.7a 2013-09-02"
 
 # Matches a timestamp as produced by the function with the same name and an
 # optional trailing backslash ('/')
@@ -186,6 +186,9 @@ elif (( SHOW_VERSION )); then
 fi
 
 if (( ! DELETE_ONLY )); then
+  # Assert DESTINATION exists
+  mkdir -p "${DESTINATION}"
+
   # Lists subdirectories of DESTINATION in descending order and trailing '/' for
   # directories. This format is then parsed by grep (see above).
   PREVIOUS_BACKUP=$(ls -1Fr "${DESTINATION}" | grep -m1 -E "${TIMESTAMP_REGEX}")
@@ -194,7 +197,7 @@ if (( ! DELETE_ONLY )); then
   PREVIOUS_BACKUP="${DESTINATION}/${PREVIOUS_BACKUP}"
   CURRENT_BACKUP="${DESTINATION}/$(timestamp)"
 
-  LOCAL_RSYNC_OPTIONS='--no-verbose --out-format="%i"'
+  LOCAL_RSYNC_OPTIONS='--no-verbose --itemize-changes'
 
   # Include the patterns from EXCLUDE
   OLD_IFS="${IFS}"
@@ -216,17 +219,15 @@ if (( ! DELETE_ONLY )); then
     LOCAL_RSYNC_OPTIONS+=" --link-dest=${PREVIOUS_BACKUP}"
   fi
 
-  mkdir -p "${CURRENT_BACKUP}"
-
   # Dry run rsync to make check for differences ...
   if (( SUPPRESS_CLUTTER )); then
-    CHANGES="$(rsync --dry-run ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} '${SOURCE}' '${CURRENT_BACKUP}')"
+    CHANGES=$(rsync ${LOCAL_RSYNC_OPTIONS} --dry-run ${RSYNC_OPTIONS} ${SOURCE} ${CURRENT_BACKUP})
   fi
 
   # Check if there were changes
   if [[ -n ${CHANGES} ]] || (( ! SUPPRESS_CLUTTER )); then
     # Finally, run rsync to make the backup ...
-    rsync ${RSYNC_OPTIONS} ${LOCAL_RSYNC_OPTIONS} "${SOURCE}" "${CURRENT_BACKUP}"
+    rsync ${LOCAL_RSYNC_OPTIONS} ${RSYNC_OPTIONS} "${SOURCE}" "${CURRENT_BACKUP}"
 
     if (( $? == 0 )); then
       log 'backup done'
@@ -234,9 +235,6 @@ if (( ! DELETE_ONLY )); then
       log 'backup failed'
     fi
   else
-    # No changes were synced; remove directory
-    rmdir "${CURRENT_BACKUP}"
-
     log 'everything in sync; backup done'
     echo "Nothing done -- everything's in sync. :)" 1>&2
   fi
