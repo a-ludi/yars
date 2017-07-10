@@ -39,8 +39,6 @@ VERSION="v0.2.0a 2017-06-10"
 # optional trailing backslash ('/')
 TIMESTAMP_REGEX="^[0-9]{4}(-[0-5][0-9]){5}\/?$"
 
-# TODO fetch paths from command line as last two params
-# TODO fetch EXCLUDE, LOG, KEEP_* from command line
 function print_help {
     (
         echo "USAGE $(basename "$0") [-fdsqhv] [FILE]"

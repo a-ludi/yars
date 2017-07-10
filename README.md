@@ -51,7 +51,6 @@ You may specify the following options in a seperate file in bash syntax.
 
 `EXCLUDE=''` – Exclude file patterns from the backup (see --exclude option
   from rsync). You may specify multiple patterns separated by colons (':').
-  (_TODO use exclude file instead_)
 
 `RSYNC_OPTIONS='-ah --delete'` – This provides a way to control rsync. This
   OVERRIDES the default options. See `man rsync` for details on the options.
@@ -70,7 +69,6 @@ unless the `--delete-only` options is present.
 
 `KEEP_NUM=0` – If you set this option to a positive integer only that much
   backups will be kept -- oldest are deleted first.
-  (_TODO make a adaptive history, eg: last 60 min, last 24 h, last 30 d, …)
 
 `KEEP_AFTER=''` – If you set this option to a to some abitrary date only
   backups newer than that date will be kept; if the date lies in the future
