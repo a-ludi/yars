@@ -20,7 +20,7 @@ Usage
 
 
 ```
-USAGE $(basename "$0") [-fdsqhv] FILE
+USAGE $(basename "$0") [-fdsqhv] [FILE]
 
     -f, --full              Run a full backup (instead of incremental)
     -d, --delete-only       Just delete backups to meet magnitude requirements
