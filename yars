@@ -72,6 +72,12 @@ function read_config {
     fi
 }
 
+function call_hook {
+    if [[ "$(type -t "$1")" == function ]]; then
+        "$1" "$@"
+    fi
+}
+
 function report {
     (( IS_QUIET )) || echo "$@"
 }
@@ -202,6 +208,8 @@ fi
 
 read_config
 
+call_hook before_init
+
 # Determine shell and set LOCAL_DESTINATION
 if is_remote "${DESTINATION}"; then
     SHELL=$(get_remote_shell "${DESTINATION}" "${RSYNC_OPTIONS}")
@@ -255,6 +263,8 @@ if (( ! DELETE_ONLY )); then
         LOCAL_RSYNC_OPTIONS+=" --link-dest=${PREVIOUS_BACKUP}"
     fi
 
+    call_hook after_init
+
     # Report parameters
     report -e '\033[1;37mSource(s):\033[00m'
     for SRC in "${SOURCES[@]}"; do
@@ -265,6 +275,8 @@ if (( ! DELETE_ONLY )); then
     report -e '\033[1;37mRsync-Options:\033[00m'
     report -e "\t${LOCAL_RSYNC_OPTIONS} ${RSYNC_OPTIONS}"
 
+    call_hook before_sync
+
     # Dry run rsync to make check for differences ...
     if (( SUPPRESS_CLUTTER )); then
         CHANGES=$(rsync --itemize-changes --dry-run ${LOCAL_RSYNC_OPTIONS} ${RSYNC_OPTIONS}\
@@ -273,10 +285,15 @@ if (( ! DELETE_ONLY )); then
 
     # Check if there were changes
     if [[ -n ${CHANGES} ]] || ! (( SUPPRESS_CLUTTER )); then
-        # Finally, run rsync to make the backup ...
-        rsync ${LOCAL_RSYNC_OPTIONS} ${RSYNC_OPTIONS} "${SOURCES[@]}" "${CURRENT_BACKUP}"
+        call_hook before_copy
 
-        if (( $? == 0 )); then
+        # Finally, run rsync to make the backup ...
+        rsync ${LOCAL_RSYNC_OPTIONS} ${RSYNC_OPTIONS} "${sourceES[@]}" "${CURRENT_BACKUP}"
+        RSYNC_STATUS=$?
+        
+        call_hook after_copy ${RSYNC_STATUS}
+
+        if (( ${RSYNC_STATUS} == 0 )); then
             log 'backup done'
             report -e '\e[1;32mBackup successfully done.\033[00m'
         else
@@ -287,8 +304,13 @@ if (( ! DELETE_ONLY )); then
         log 'everything in sync; backup done'
         report -e '\e[1;32mNo changes since last backup.\033[00m'
     fi
+
+    call_hook after_sync
+else
+    call_hook after_init
 fi
 
+call_hook before_deletion
 
 # Now, let's delete old backups if desired!
 
@@ -340,3 +362,5 @@ EOF
         log 'warning: KEEP_AFTER lies in the future; doing nothing'
     fi
 fi
+
+call_hook after_deletion

@@ -79,6 +79,32 @@ unless the `--delete-only` options is present.
   and `info coreutils 'date input formats'` for details.
 
 
+### Opertional Hooks
+
+You may use these operational hooks to influence the behaviour of the script.
+To use the hooks just define a shell function in your config file, eg.
+
+```sh
+function after_deletion {
+    echo 'current list of backups:' && ls
+}
+```
+
+`before_init`, `after_init` – the init procedure which sets all the required
+  variables and creates the destination folder.
+
+`before_sync` – is called before any rsync action is run; if
+  `--suppress-clutter` is active then a dry run will happen immediately after
+  this and before the next hook.
+
+`before_copy`, `after_copy ${RSYNC_STATUS}` – rsync does its job
+
+`after_sync` – see above
+
+`before_deletion`, `after_deletion` – this section runs the clean up
+  controlled by `KEEP_NUM` and `KEEP_AFTER`; the hooks are called in any case.
+
+
 License
 =======
 
