@@ -33,7 +33,7 @@ DEALINGS IN THE SOFTWARE.'
 : ${KEEP_NUM:=0}
 : ${KEEP_AFTER:=''}
 
-VERSION="v0.2.0a 2017-06-10"
+VERSION="v0.2.1a 2017-06-10"
 
 # Matches a timestamp as produced by the function with the same name and an
 # optional trailing backslash ('/')
