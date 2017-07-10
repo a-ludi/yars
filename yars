@@ -286,7 +286,7 @@ if (( ! DELETE_ONLY )); then
         call_hook before_copy
 
         # Finally, run rsync to make the backup ...
-        rsync ${LOCAL_RSYNC_OPTIONS} ${RSYNC_OPTIONS} "${sourceES[@]}" "${CURRENT_BACKUP}"
+        rsync ${LOCAL_RSYNC_OPTIONS} ${RSYNC_OPTIONS} "${SOURCES[@]}" "${CURRENT_BACKUP}"
         RSYNC_STATUS=$?
         
         call_hook after_copy ${RSYNC_STATUS}
